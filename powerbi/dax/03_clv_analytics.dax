@@ -1,0 +1,155 @@
+// CLV & CUSTOMER ANALYTICS — References CUSTOMER_CLV table
+// Source: src/snowpark/clv_model.py
+// Table: ANALYTICS.CUSTOMER_CLV
+// Columns: CUSTOMER_KEY, RECENCY, FREQUENCY, MONETARY, AVG_ORDER_VALUE,
+//          LIFESPAN_DAYS, PURCHASE_REGULARITY, SEGMENT, SEGMENT_LABEL,
+//          PREDICTED_CLV, MODEL_VERSION
+// Segment labels: Champions, Loyal, Potential, At Risk, Hibernating
+
+
+// ── CORE CLV METRICS ──────────────────────────────────────────────────────
+
+Average CLV = 
+    AVERAGE(CUSTOMER_CLV[PREDICTED_CLV])
+
+Total Predicted CLV = 
+    SUM(CUSTOMER_CLV[PREDICTED_CLV])
+
+Median CLV = 
+    MEDIAN(CUSTOMER_CLV[PREDICTED_CLV])
+
+CLV Standard Deviation = 
+    STDEV.P(CUSTOMER_CLV[PREDICTED_CLV])
+
+CLV Coefficient of Variation = 
+    DIVIDE([CLV Standard Deviation], [Average CLV], 0)
+
+
+// ── SEGMENT COUNTS ────────────────────────────────────────────────────────
+
+Champions Count = 
+    CALCULATE(
+        DISTINCTCOUNT(CUSTOMER_CLV[CUSTOMER_KEY]),
+        CUSTOMER_CLV[SEGMENT_LABEL] = "Champions"
+    )
+
+Loyal Count = 
+    CALCULATE(
+        DISTINCTCOUNT(CUSTOMER_CLV[CUSTOMER_KEY]),
+        CUSTOMER_CLV[SEGMENT_LABEL] = "Loyal"
+    )
+
+Potential Count = 
+    CALCULATE(
+        DISTINCTCOUNT(CUSTOMER_CLV[CUSTOMER_KEY]),
+        CUSTOMER_CLV[SEGMENT_LABEL] = "Potential"
+    )
+
+At Risk Count = 
+    CALCULATE(
+        DISTINCTCOUNT(CUSTOMER_CLV[CUSTOMER_KEY]),
+        CUSTOMER_CLV[SEGMENT_LABEL] = "At Risk"
+    )
+
+Hibernating Count = 
+    CALCULATE(
+        DISTINCTCOUNT(CUSTOMER_CLV[CUSTOMER_KEY]),
+        CUSTOMER_CLV[SEGMENT_LABEL] = "Hibernating"
+    )
+
+
+// ── SEGMENT AVERAGES ──────────────────────────────────────────────────────
+
+Champions Avg CLV = 
+    CALCULATE([Average CLV], CUSTOMER_CLV[SEGMENT_LABEL] = "Champions")
+
+At Risk Avg CLV = 
+    CALCULATE([Average CLV], CUSTOMER_CLV[SEGMENT_LABEL] = "At Risk")
+
+Segment Revenue Contribution = 
+    // Revenue from customers in the selected segment
+    VAR SegmentCustomers = VALUES(CUSTOMER_CLV[CUSTOMER_KEY])
+    RETURN
+        CALCULATE(
+            [Total Revenue],
+            TREATAS(SegmentCustomers, FACT_ORDERS[CUSTOMER_KEY])
+        )
+
+Segment Revenue Pct = 
+    DIVIDE(
+        [Segment Revenue Contribution],
+        CALCULATE([Total Revenue], ALL(CUSTOMER_CLV)),
+        0
+    )
+
+
+// ── RFM SCORE ANALYSIS ───────────────────────────────────────────────────
+
+Average R Score = 
+    AVERAGE(CUSTOMER_CLV[RECENCY])
+
+Average F Score = 
+    AVERAGE(CUSTOMER_CLV[FREQUENCY])
+
+Average M Score = 
+    AVERAGE(CUSTOMER_CLV[MONETARY])
+
+Average Purchase Regularity = 
+    AVERAGE(CUSTOMER_CLV[PURCHASE_REGULARITY])
+
+Average Lifespan Days = 
+    AVERAGE(CUSTOMER_CLV[LIFESPAN_DAYS])
+
+
+// ── WHAT-IF ANALYSIS ──────────────────────────────────────────────────────
+// Create What-If Parameter in Power BI Desktop:
+//   Name: CLV Threshold
+//   Min: 0, Max: 5000, Default: 500, Increment: 50
+// This auto-creates a table 'CLV Threshold' with column [CLV Threshold Value]
+
+Customers Above Threshold = 
+    CALCULATE(
+        DISTINCTCOUNT(CUSTOMER_CLV[CUSTOMER_KEY]),
+        CUSTOMER_CLV[PREDICTED_CLV] >= 'CLV Threshold'[CLV Threshold Value]
+    )
+
+Pct Customers Above Threshold = 
+    DIVIDE(
+        [Customers Above Threshold],
+        COUNTROWS(CUSTOMER_CLV),
+        0
+    )
+
+Revenue from Above Threshold = 
+    VAR AboveKeys = 
+        CALCULATETABLE(
+            VALUES(CUSTOMER_CLV[CUSTOMER_KEY]),
+            CUSTOMER_CLV[PREDICTED_CLV] >= 'CLV Threshold'[CLV Threshold Value]
+        )
+    RETURN
+        CALCULATE(
+            [Total Revenue],
+            TREATAS(AboveKeys, FACT_ORDERS[CUSTOMER_KEY])
+        )
+
+
+// ── COHORT ANALYSIS ──────────────────────────────────────────────────────
+
+Customer First Purchase Month = 
+    // Use on DIM_CUSTOMERS for cohort grouping
+    FORMAT(DIM_CUSTOMERS[FIRST_ORDER_DATE], "YYYY-MM")
+
+Cohort Size = 
+    // Count of customers whose first purchase was in the selected month
+    DISTINCTCOUNT(DIM_CUSTOMERS[CUSTOMER_KEY])
+
+Repeat Purchase Rate = 
+    // Customers with >1 order / all customers
+    DIVIDE(
+        CALCULATE(
+            DISTINCTCOUNT(DIM_CUSTOMERS[CUSTOMER_KEY]),
+            DIM_CUSTOMERS[TOTAL_ORDERS] > 1
+        ),
+        DISTINCTCOUNT(DIM_CUSTOMERS[CUSTOMER_KEY]),
+        0
+    )

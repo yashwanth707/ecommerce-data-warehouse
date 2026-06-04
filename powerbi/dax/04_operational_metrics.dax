@@ -1,0 +1,141 @@
+// OPERATIONAL PERFORMANCE METRICS
+// DELIVERY_PERFORMANCE values: "ON_TIME", "LATE", "PENDING"
+// ORDER_STATUS values: delivered, shipped, canceled, invoiced, processing, etc.
+// PAYMENT_TYPE: LISTAGG string — use CONTAINSSTRING for filtering
+
+
+// ── DELIVERY PERFORMANCE ──────────────────────────────────────────────────
+
+On Time Orders = 
+    CALCULATE(
+        [Total Orders],
+        FACT_ORDERS[DELIVERY_PERFORMANCE] = "ON_TIME"
+    )
+
+Late Orders = 
+    CALCULATE(
+        [Total Orders],
+        FACT_ORDERS[DELIVERY_PERFORMANCE] = "LATE"
+    )
+
+Pending Orders = 
+    CALCULATE(
+        [Total Orders],
+        FACT_ORDERS[DELIVERY_PERFORMANCE] = "PENDING"
+    )
+
+On Time Delivery Rate = 
+    DIVIDE([On Time Orders], [Total Orders], 0)
+
+Late Delivery Rate = 
+    DIVIDE([Late Orders], [Total Orders], 0)
+
+Average Delivery Days = 
+    AVERAGE(FACT_ORDERS[DELIVERY_DAYS])
+
+Estimated vs Actual Delivery Gap = 
+    AVERAGE(FACT_ORDERS[ESTIMATED_DELIVERY_DAYS]) - [Average Delivery Days]
+
+Delivery SLA Met = 
+    // Positive gap = delivered early, Negative = late
+    IF([Estimated vs Actual Delivery Gap] >= 0, "Within SLA", "SLA Breached")
+
+
+// ── ORDER STATUS FUNNEL ──────────────────────────────────────────────────
+
+Orders Delivered = 
+    CALCULATE([Total Orders], FACT_ORDERS[ORDER_STATUS] = "delivered")
+
+Orders Shipped = 
+    CALCULATE([Total Orders], FACT_ORDERS[ORDER_STATUS] = "shipped")
+
+Orders Canceled = 
+    CALCULATE([Total Orders], FACT_ORDERS[ORDER_STATUS] = "canceled")
+
+Orders Processing = 
+    CALCULATE([Total Orders], FACT_ORDERS[ORDER_STATUS] = "processing")
+
+Orders Invoiced = 
+    CALCULATE([Total Orders], FACT_ORDERS[ORDER_STATUS] = "invoiced")
+
+Cancellation Rate = 
+    DIVIDE([Orders Canceled], [Total Orders], 0)
+
+Fulfillment Rate = 
+    DIVIDE([Orders Delivered], [Total Orders], 0)
+
+
+// ── PAYMENT ANALYSIS ──────────────────────────────────────────────────────
+// PAYMENT_TYPE is LISTAGG: "boleto, credit_card" etc.
+// Use CONTAINSSTRING, NOT equals
+
+Revenue by Credit Card = 
+    CALCULATE(
+        [Total Revenue],
+        CONTAINSSTRING(FACT_ORDERS[PAYMENT_TYPE], "credit_card")
+    )
+
+Revenue by Boleto = 
+    CALCULATE(
+        [Total Revenue],
+        CONTAINSSTRING(FACT_ORDERS[PAYMENT_TYPE], "boleto")
+    )
+
+Revenue by Debit Card = 
+    CALCULATE(
+        [Total Revenue],
+        CONTAINSSTRING(FACT_ORDERS[PAYMENT_TYPE], "debit_card")
+    )
+
+Revenue by Voucher = 
+    CALCULATE(
+        [Total Revenue],
+        CONTAINSSTRING(FACT_ORDERS[PAYMENT_TYPE], "voucher")
+    )
+
+Pct Revenue Credit Card = 
+    DIVIDE([Revenue by Credit Card], [Total Revenue], 0)
+
+Average Installments = 
+    AVERAGE(FACT_ORDERS[MAX_INSTALLMENTS])
+
+
+// ── REVIEW SENTIMENT ──────────────────────────────────────────────────────
+
+Avg Review Score = 
+    AVERAGE(FACT_ORDERS[AVG_REVIEW_SCORE])
+
+Low Review Orders = 
+    // Orders with avg review below 3
+    CALCULATE(
+        COUNTROWS(FACT_ORDERS),
+        FACT_ORDERS[AVG_REVIEW_SCORE] > 0
+            && FACT_ORDERS[AVG_REVIEW_SCORE] < 3
+    )
+
+High Review Orders = 
+    CALCULATE(
+        COUNTROWS(FACT_ORDERS),
+        FACT_ORDERS[AVG_REVIEW_SCORE] >= 4
+    )
+
+Review Satisfaction Rate = 
+    DIVIDE([High Review Orders], COUNTROWS(FACT_ORDERS), 0)
+
+
+// ── SELLER PERFORMANCE (via fact_order_items) ─────────────────────────────
+
+Seller Revenue = 
+    SUM(FACT_ORDER_ITEMS[PRICE])
+
+Seller Avg Item Price = 
+    AVERAGE(FACT_ORDER_ITEMS[PRICE])
+
+Seller Items Sold = 
+    COUNTROWS(FACT_ORDER_ITEMS)
+
+Top Seller Revenue = 
+    MAXX(
+        VALUES(DIM_SELLERS[SELLER_KEY]),
+        [Seller Revenue]
+    )

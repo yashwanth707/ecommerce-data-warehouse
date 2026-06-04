@@ -1,0 +1,78 @@
+# Bronze Layer Sources
+# These reference the raw VARIANT tables created by the
+# Python ingestion module (s3_to_snowflake.py).
+
+version: 2
+
+sources:
+  - name: bronze
+    description: >
+      Raw data ingested from S3 into Snowflake as VARIANT type.
+      Each table has metadata columns: ingestion_timestamp,
+      source_file, file_timestamp, checksum.
+    database: "{{ env_var('SNOWFLAKE_DATABASE', 'ECOMMERCE_DW') }}"
+    schema: RAW
+    freshness:
+      warn_after:
+        count: 24
+        period: hour
+      error_after:
+        count: 48
+        period: hour
+    loaded_at_field: ingestion_timestamp
+    tags: ["bronze"]
+
+    tables:
+      - name: bronze_orders
+        description: Raw order data with timestamps and status
+        columns:
+          - name: raw_data
+            description: VARIANT column containing the full order record
+          - name: ingestion_timestamp
+            description: When this record was ingested into Bronze
+          - name: source_file
+            description: S3 key of the source file
+          - name: checksum
+            description: SHA-256 hash of the raw record
+
+      - name: bronze_customers
+        description: Raw customer data with location information
+        columns:
+          - name: raw_data
+            description: VARIANT column containing the full customer record
+
+      - name: bronze_products
+        description: Raw product data with attributes and dimensions
+        columns:
+          - name: raw_data
+            description: VARIANT column containing the full product record
+
+      - name: bronze_order_items
+        description: Raw order line items with pricing
+        columns:
+          - name: raw_data
+            description: VARIANT column containing the full order item record
+
+      - name: bronze_payments
+        description: Raw payment data with method and installments
+        columns:
+          - name: raw_data
+            description: VARIANT column containing the full payment record
+
+      - name: bronze_reviews
+        description: Raw review data with scores and comments
+        columns:
+          - name: raw_data
+            description: VARIANT column containing the full review record
+
+      - name: bronze_geolocation
+        description: Raw geolocation data with lat/lng coordinates
+        columns:
+          - name: raw_data
+            description: VARIANT column containing the full geolocation record
+
+      - name: bronze_sellers
+        description: Raw seller data with location information
+        columns:
+          - name: raw_data
+            description: VARIANT column containing the full seller record

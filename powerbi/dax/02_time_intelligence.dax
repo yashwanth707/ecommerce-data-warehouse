@@ -1,0 +1,141 @@
+// TIME INTELLIGENCE — Uses DIM_TIME[DATE_KEY] as marked Date Table
+// PREREQUISITE: In Power BI, mark DIM_TIME as the Date Table using DATE_KEY.
+// This enables all TOTALMTD, TOTALYTD, SAMEPERIODLASTYEAR functions.
+
+
+// ── PERIOD ACCUMULATIONS ──────────────────────────────────────────────────
+
+Revenue MTD = 
+    TOTALMTD([Total Revenue], DIM_TIME[DATE_KEY])
+
+Revenue QTD = 
+    TOTALQTD([Total Revenue], DIM_TIME[DATE_KEY])
+
+Revenue YTD = 
+    TOTALYTD([Total Revenue], DIM_TIME[DATE_KEY])
+
+Orders MTD = 
+    TOTALMTD([Total Orders], DIM_TIME[DATE_KEY])
+
+Orders YTD = 
+    TOTALYTD([Total Orders], DIM_TIME[DATE_KEY])
+
+
+// ── PREVIOUS PERIOD COMPARISONS ───────────────────────────────────────────
+
+Revenue Previous Month = 
+    CALCULATE(
+        [Total Revenue],
+        DATEADD(DIM_TIME[DATE_KEY], -1, MONTH)
+    )
+
+Revenue Previous Quarter = 
+    CALCULATE(
+        [Total Revenue],
+        DATEADD(DIM_TIME[DATE_KEY], -1, QUARTER)
+    )
+
+Revenue Previous Year = 
+    CALCULATE(
+        [Total Revenue],
+        SAMEPERIODLASTYEAR(DIM_TIME[DATE_KEY])
+    )
+
+Orders Previous Month = 
+    CALCULATE(
+        [Total Orders],
+        DATEADD(DIM_TIME[DATE_KEY], -1, MONTH)
+    )
+
+
+// ── GROWTH CALCULATIONS ──────────────────────────────────────────────────
+
+Revenue MoM Growth Pct = 
+    VAR CurrentMonth = [Total Revenue]
+    VAR PrevMonth = [Revenue Previous Month]
+    RETURN
+        DIVIDE(CurrentMonth - PrevMonth, PrevMonth, 0)
+
+Revenue YoY Growth Pct = 
+    VAR Current = [Total Revenue]
+    VAR PrevYear = [Revenue Previous Year]
+    RETURN
+        DIVIDE(Current - PrevYear, PrevYear, 0)
+
+Orders MoM Growth Pct = 
+    VAR Current = [Total Orders]
+    VAR Prev = [Orders Previous Month]
+    RETURN
+        DIVIDE(Current - Prev, Prev, 0)
+
+// Conditional formatting helper
+Revenue Growth Color = 
+    IF(
+        [Revenue YoY Growth Pct] > 0,
+        "#2ca02c",
+        IF([Revenue YoY Growth Pct] < 0, "#d62728", "#7f7f7f")
+    )
+
+
+// ── MOVING AVERAGES ──────────────────────────────────────────────────────
+
+Revenue 7 Day MA = 
+    AVERAGEX(
+        DATESINPERIOD(DIM_TIME[DATE_KEY], LASTDATE(DIM_TIME[DATE_KEY]), -7, DAY),
+        [Total Revenue]
+    )
+
+Revenue 30 Day MA = 
+    AVERAGEX(
+        DATESINPERIOD(DIM_TIME[DATE_KEY], LASTDATE(DIM_TIME[DATE_KEY]), -30, DAY),
+        [Total Revenue]
+    )
+
+
+// ── DYNAMIC PERIOD SELECTOR ──────────────────────────────────────────────
+// Create a disconnected table 'Period Selector' with column [Period]:
+//   "MTD", "QTD", "YTD", "Last 30 Days", "All Time"
+
+Selected Period Revenue = 
+    SWITCH(
+        SELECTEDVALUE('Period Selector'[Period]),
+        "MTD", [Revenue MTD],
+        "QTD", [Revenue QTD],
+        "YTD", [Revenue YTD],
+        "Last 30 Days",
+            CALCULATE(
+                [Total Revenue],
+                DATESINPERIOD(DIM_TIME[DATE_KEY], TODAY(), -30, DAY)
+            ),
+        [Total Revenue]
+    )
+
+Selected Period Orders = 
+    SWITCH(
+        SELECTEDVALUE('Period Selector'[Period]),
+        "MTD", [Orders MTD],
+        "QTD", TOTALQTD([Total Orders], DIM_TIME[DATE_KEY]),
+        "YTD", [Orders YTD],
+        "Last 30 Days",
+            CALCULATE(
+                [Total Orders],
+                DATESINPERIOD(DIM_TIME[DATE_KEY], TODAY(), -30, DAY)
+            ),
+        [Total Orders]
+    )
+
+
+// ── CALCULATION GROUP (for report-level time intelligence) ────────────────
+// NOTE: Calculation Groups require Tabular Editor or XMLA endpoint.
+// Document as production feature. For Desktop, use the Period Selector above.
+//
+// Calculation Group: "Time Calculation"
+// Items:
+//   Current        = SELECTEDMEASURE()
+//   MTD            = TOTALMTD(SELECTEDMEASURE(), DIM_TIME[DATE_KEY])
+//   YTD            = TOTALYTD(SELECTEDMEASURE(), DIM_TIME[DATE_KEY])
+//   Prior Month    = CALCULATE(SELECTEDMEASURE(), DATEADD(DIM_TIME[DATE_KEY], -1, MONTH))
+//   Prior Year     = CALCULATE(SELECTEDMEASURE(), SAMEPERIODLASTYEAR(DIM_TIME[DATE_KEY]))
+//   MoM Growth %   = VAR Cur = SELECTEDMEASURE()
+//                     VAR Prev = CALCULATE(SELECTEDMEASURE(), DATEADD(DIM_TIME[DATE_KEY],-1,MONTH))
+//                     RETURN DIVIDE(Cur-Prev, Prev)

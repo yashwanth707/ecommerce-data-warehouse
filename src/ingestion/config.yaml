@@ -1,0 +1,87 @@
+# Ingestion Configuration
+
+snowflake:
+  account: ${SNOWFLAKE_ACCOUNT}
+  user: ${SNOWFLAKE_USER}
+  password: ${SNOWFLAKE_PASSWORD}
+  role: SYSADMIN
+  warehouse: ECOMMERCE_WH
+  database: ECOMMERCE_DW
+  schema: RAW
+
+aws:
+  access_key_id: ${AWS_ACCESS_KEY_ID}
+  secret_access_key: ${AWS_SECRET_ACCESS_KEY}
+  region: us-east-1
+  s3_bucket: ecommerce-raw-data
+  s3_prefix: olist/
+
+ingestion:
+  batch_size: 10000
+  max_retries: 3
+  lookback_hours: 48  # Re-check files modified in last 48h
+
+# Bronze table S3 mappings
+tables:
+  orders:
+    s3_prefix: orders/
+    file_pattern: olist_orders_dataset
+    expected_columns:
+      - order_id
+      - customer_id
+      - order_status
+      - order_purchase_timestamp
+  customers:
+    s3_prefix: customers/
+    file_pattern: olist_customers_dataset
+    expected_columns:
+      - customer_id
+      - customer_unique_id
+      - customer_zip_code_prefix
+      - customer_city
+      - customer_state
+  products:
+    s3_prefix: products/
+    file_pattern: olist_products_dataset
+    expected_columns:
+      - product_id
+      - product_category_name
+  order_items:
+    s3_prefix: order_items/
+    file_pattern: olist_order_items_dataset
+    expected_columns:
+      - order_id
+      - order_item_id
+      - product_id
+      - seller_id
+      - price
+      - freight_value
+  payments:
+    s3_prefix: payments/
+    file_pattern: olist_order_payments_dataset
+    expected_columns:
+      - order_id
+      - payment_type
+      - payment_value
+  reviews:
+    s3_prefix: reviews/
+    file_pattern: olist_order_reviews_dataset
+    expected_columns:
+      - review_id
+      - order_id
+      - review_score
+  geolocation:
+    s3_prefix: geolocation/
+    file_pattern: olist_geolocation_dataset
+    expected_columns:
+      - geolocation_zip_code_prefix
+      - geolocation_lat
+      - geolocation_lng
+  sellers:
+    s3_prefix: sellers/
+    file_pattern: olist_sellers_dataset
+    expected_columns:
+      - seller_id
+      - seller_zip_code_prefix
+      - seller_city
+      - seller_state

@@ -1,0 +1,10 @@
+# Backend API dependencies only
+fastapi>=0.109.0
+uvicorn>=0.27.0
+snowflake-connector-python>=3.6.0
+pandas>=2.1.0
+python-dotenv>=1.0.0
+loguru>=0.7.0
+requests>=2.31.0
+httpx>=0.26.0
+ollama>=0.1.0

@@ -1,0 +1,93 @@
+# dbt Project Configuration — E-Commerce Data Warehouse
+
+name: "ecommerce_dw"
+version: "1.0.0"
+config-version: 2
+
+profile: "ecommerce_dw"
+
+# Model Configurations
+models:
+  ecommerce_dw:
+    # ─── Bronze Layer ──────────────────────────────────────
+    bronze:
+      +schema: raw
+      +materialized: view
+      +tags: ["bronze", "raw"]
+
+    # ─── Silver Layer ──────────────────────────────────────
+    silver:
+      +schema: cleansed
+      +materialized: incremental
+      +incremental_strategy: merge
+      +on_schema_change: append_new_columns
+      +tags: ["silver", "cleansed"]
+      +transient: true
+
+    # ─── Gold Layer ────────────────────────────────────────
+    gold:
+      +schema: analytics
+      +materialized: table
+      +tags: ["gold", "business_ready"]
+
+# Snapshot Configuration
+snapshots:
+  ecommerce_dw:
+    +target_schema: snapshots
+    +strategy: timestamp
+
+# Test Configuration
+tests:
+  ecommerce_dw:
+    +severity: warn
+    +store_failures: true
+
+# Seeds
+seeds:
+  ecommerce_dw:
+    +schema: seeds
+
+# Variables
+vars:
+  date_spine_start: "2016-01-01"
+  date_spine_end: "2025-12-31"
+  brazil_holidays:
+    - "2017-01-01"  # New Year
+    - "2017-02-27"  # Carnival Monday
+    - "2017-02-28"  # Carnival Tuesday
+    - "2017-04-14"  # Good Friday
+    - "2017-04-21"  # Tiradentes
+    - "2017-05-01"  # Labour Day
+    - "2017-09-07"  # Independence
+    - "2017-10-12"  # Our Lady
+    - "2017-11-02"  # All Souls
+    - "2017-11-15"  # Republic Day
+    - "2017-12-25"  # Christmas
+    - "2018-01-01"
+    - "2018-02-12"
+    - "2018-02-13"
+    - "2018-03-30"
+    - "2018-04-21"
+    - "2018-05-01"
+    - "2018-09-07"
+    - "2018-10-12"
+    - "2018-11-02"
+    - "2018-11-15"
+    - "2018-12-25"
+
+# Paths
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Packages (install with `dbt deps`)
+dispatch:
+  - macro_namespace: dbt_utils
+    search_order: ["ecommerce_dw", "dbt_utils"]

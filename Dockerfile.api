@@ -1,0 +1,21 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies for some python packages if needed
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements for the dashboard API
+COPY requirements-api.txt .
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements-api.txt
+
+# The rest of the app is mounted via volumes for development
+# but it's good to have a placeholder for production cases
+# COPY . .
+
+CMD ["python", "src/dashboard/dashboard_api.py"]

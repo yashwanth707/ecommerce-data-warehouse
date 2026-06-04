@@ -1,0 +1,122 @@
+// KPI CORE MEASURES — Corrected for ANALYTICS schema
+// All column references verified against:
+//   - src/dbt/models/gold/fact_orders.sql
+//   - src/dbt/models/gold/dim_customers.sql
+//   - src/dbt/models/gold/fact_order_items.sql (new)
+//   - src/snowpark/clv_model.py → CUSTOMER_CLV table
+
+
+// ── SECTION 1: REVENUE KPIs ────────────────────────────────────────────────
+
+Total Revenue = 
+    SUM(FACT_ORDERS[PAYMENT_VALUE])
+
+Total Revenue Formatted = 
+    "R$ " & FORMAT([Total Revenue], "#,##0.00")
+
+Revenue per Order = 
+    DIVIDE([Total Revenue], [Total Orders], 0)
+
+Revenue per Customer = 
+    DIVIDE(
+        [Total Revenue],
+        DISTINCTCOUNT(FACT_ORDERS[CUSTOMER_KEY]),
+        0
+    )
+
+Total Product Value = 
+    SUM(FACT_ORDERS[TOTAL_PRODUCT_VALUE])
+
+Total Freight Cost = 
+    SUM(FACT_ORDERS[TOTAL_FREIGHT])
+
+Total Profit Margin = 
+    SUM(FACT_ORDERS[PROFIT_MARGIN])
+
+Avg Profit Margin % = 
+    AVERAGE(FACT_ORDERS[PROFIT_MARGIN_PCT])
+
+Freight as % of Revenue = 
+    DIVIDE([Total Freight Cost], [Total Product Value], 0)
+
+
+// ── SECTION 2: ORDER KPIs ──────────────────────────────────────────────────
+
+Total Orders = 
+    DISTINCTCOUNT(FACT_ORDERS[ORDER_ID])
+
+Total Order Items = 
+    SUM(FACT_ORDERS[TOTAL_ITEMS])
+
+Average Order Value = 
+    DIVIDE([Total Revenue], [Total Orders], 0)
+
+Average Items per Order = 
+    DIVIDE([Total Order Items], [Total Orders], 0)
+
+Average Basket Size = 
+    // Item-grain calculation via fact_order_items
+    AVERAGEX(
+        VALUES(FACT_ORDER_ITEMS[ORDER_KEY]),
+        CALCULATE(SUM(FACT_ORDER_ITEMS[PRICE]))
+    )
+
+
+// ── SECTION 3: CUSTOMER KPIs ──────────────────────────────────────────────
+
+Active Customers = 
+    DISTINCTCOUNT(FACT_ORDERS[CUSTOMER_KEY])
+
+Total Customer Base = 
+    DISTINCTCOUNT(DIM_CUSTOMERS[CUSTOMER_KEY])
+
+Average Review Score = 
+    AVERAGE(FACT_ORDERS[AVG_REVIEW_SCORE])
+
+Pct 5 Star Reviews = 
+    DIVIDE(
+        CALCULATE(
+            COUNTROWS(FACT_ORDERS),
+            FACT_ORDERS[AVG_REVIEW_SCORE] >= 4.5
+        ),
+        COUNTROWS(FACT_ORDERS),
+        0
+    )
+
+
+// ── SECTION 4: PRODUCT KPIs (via fact_order_items) ─────────────────────────
+
+Total Products Sold = 
+    DISTINCTCOUNT(FACT_ORDER_ITEMS[PRODUCT_KEY])
+
+Item Revenue = 
+    SUM(FACT_ORDER_ITEMS[PRICE])
+
+Item Freight = 
+    SUM(FACT_ORDER_ITEMS[FREIGHT_VALUE])
+
+Average Item Price = 
+    AVERAGE(FACT_ORDER_ITEMS[PRICE])
+
+Top Category Revenue = 
+    // Use with dim_products hierarchy
+    CALCULATE(
+        SUM(FACT_ORDER_ITEMS[TOTAL_ITEM_VALUE]),
+        TOPN(1, ALL(DIM_PRODUCTS[CATEGORY_NAME_ENGLISH]), [Item Revenue], DESC)
+    )
+
+
+// ── SECTION 5: SELLER KPIs (via fact_order_items) ──────────────────────────
+
+Active Sellers = 
+    DISTINCTCOUNT(FACT_ORDER_ITEMS[SELLER_KEY])
+
+Revenue per Seller = 
+    DIVIDE([Item Revenue], [Active Sellers], 0)
+
+Items per Seller = 
+    DIVIDE(
+        COUNTROWS(FACT_ORDER_ITEMS),
+        [Active Sellers],
+        0
+    )

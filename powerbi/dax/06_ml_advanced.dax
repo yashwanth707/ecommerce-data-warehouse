@@ -1,0 +1,96 @@
+// 06_ML_ADVANCED.DAX
+// Advanced Machine Learning & Predictive Analytics Measures
+
+// ── MODEL 1: BEHAVIORAL SEGMENTATION ──────────────────────────────────────
+Behavioral Customers Scored = 
+    COUNTROWS(CUSTOMER_SEGMENTS)
+
+Avg Freight Ratio = 
+    AVERAGE(CUSTOMER_SEGMENTS[FREIGHT_RATIO])
+
+Avg Installments Used = 
+    AVERAGE(CUSTOMER_SEGMENTS[AVG_INSTALLMENTS])
+
+Behavioral Segment Revenue = 
+    // Revenue from customers in the selected behavioral segment
+    VAR SegmentCustomers = VALUES(CUSTOMER_SEGMENTS[CUSTOMER_KEY])
+    RETURN
+        CALCULATE(
+            [Total Revenue],
+            TREATAS(SegmentCustomers, FACT_ORDERS[CUSTOMER_KEY])
+        )
+
+
+// ── MODEL 2: DELIVERY RISK PREDICTION ─────────────────────────────────────
+Orders Scored for Risk = 
+    COUNTROWS(DELIVERY_RISK)
+
+High Risk Orders = 
+    CALCULATE(
+        [Orders Scored for Risk], 
+        DELIVERY_RISK[RISK_TIER] = "HIGH RISK"
+    )
+
+Medium Risk Orders = 
+    CALCULATE(
+        [Orders Scored for Risk], 
+        DELIVERY_RISK[RISK_TIER] = "MEDIUM RISK"
+    )
+
+Low Risk Orders = 
+    CALCULATE(
+        [Orders Scored for Risk], 
+        DELIVERY_RISK[RISK_TIER] = "LOW RISK"
+    )
+
+Avg Delay Probability = 
+    AVERAGE(DELIVERY_RISK[DELAY_PROBABILITY])
+
+Actual Late in Scored Set = 
+    CALCULATE(
+        [Orders Scored for Risk],
+        DELIVERY_RISK[IS_LATE_ACTUAL] = 1
+    )
+
+
+// ── MODEL 3: SELLER RISK MANAGEMENT ───────────────────────────────────────
+Sellers Scored = 
+    COUNTROWS(SELLER_SEGMENTS)
+
+Avg Seller Risk Score = 
+    AVERAGE(SELLER_SEGMENTS[RISK_SCORE])
+
+Avg Seller Delay (Days) = 
+    AVERAGE(SELLER_SEGMENTS[AVG_DELIVERY_DELAY])
+
+Avg Seller Cancel Rate = 
+    AVERAGE(SELLER_SEGMENTS[CANCELLATION_RATE])
+
+High Risk Seller Revenue = 
+    VAR RiskySellers = 
+        CALCULATETABLE(
+            VALUES(SELLER_SEGMENTS[SELLER_ID]),
+            SELLER_SEGMENTS[SEGMENT_LABEL] = "High-Risk / Poor Quality"
+        )
+    RETURN
+        CALCULATE(
+            [Total Revenue],
+            TREATAS(RiskySellers, DIM_SELLERS[SELLER_ID])
+        )
+
+
+// ── ML MODEL REGISTRY ─────────────────────────────────────────────────────
+Total Models Run = 
+    COUNTROWS(ML_MODEL_REGISTRY)
+
+Models Retained = 
+    CALCULATE(
+        [Total Models Run], 
+        ML_MODEL_REGISTRY[STATUS] = "RETAINED"
+    )
+
+Models Dropped = 
+    CALCULATE(
+        [Total Models Run], 
+        ML_MODEL_REGISTRY[STATUS] = "DROPPED"
+    )

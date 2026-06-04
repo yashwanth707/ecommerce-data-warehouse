@@ -1,0 +1,156 @@
+# Silver Layer — Schema, Documentation & Tests
+
+version: 2
+
+models:
+  # ─── Silver Orders ───────────────────────────────────────
+  - name: silver_orders
+    description: >
+      Cleansed and typed order data with delivery performance metrics.
+      Incremental merge on order_id.
+    columns:
+      - name: order_id
+        description: Primary key — unique order identifier
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Foreign key to customers
+        tests:
+          - not_null
+          - relationships:
+              to: ref('silver_customers')
+              field: customer_id
+      - name: order_status
+        description: Current status of the order
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - DELIVERED
+                - SHIPPED
+                - CANCELED
+                - UNAVAILABLE
+                - INVOICED
+                - PROCESSING
+                - CREATED
+                - APPROVED
+      - name: order_purchase_timestamp
+        tests:
+          - not_null
+      - name: delivery_performance
+        description: "ON_TIME, LATE, or PENDING based on actual vs estimated delivery"
+        tests:
+          - accepted_values:
+              values: ["ON_TIME", "LATE", "PENDING"]
+
+  # ─── Silver Customers ───────────────────────────────────
+  - name: silver_customers
+    description: >
+      Cleansed customer data with standardized location fields
+      and data quality flags for invalid zip codes.
+    columns:
+      - name: customer_id
+        description: Primary key — unique customer identifier
+        tests:
+          - unique
+          - not_null
+      - name: customer_unique_id
+        description: De-anonymized customer ID (one customer may have multiple customer_ids)
+        tests:
+          - not_null
+      - name: customer_state
+        description: Two-letter Brazilian state code
+        tests:
+          - not_null
+
+  # ─── Silver Order Items ─────────────────────────────────
+  - name: silver_order_items
+    description: >
+      Order line items with calculated total value and freight metrics.
+    columns:
+      - name: order_item_key
+        description: Surrogate key (order_id + order_item_id)
+        tests:
+          - unique
+          - not_null
+      - name: order_id
+        description: Foreign key to orders
+        tests:
+          - not_null
+          - relationships:
+              to: ref('silver_orders')
+              field: order_id
+      - name: product_id
+        description: Foreign key to products
+        tests:
+          - not_null
+      - name: price
+        description: Item price in BRL
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 100000
+
+  # ─── Silver Payments ────────────────────────────────────
+  - name: silver_payments
+    description: Payment methods and values per order.
+    columns:
+      - name: payment_key
+        description: Surrogate key (order_id + payment_sequential)
+        tests:
+          - unique
+          - not_null
+      - name: order_id
+        tests:
+          - not_null
+      - name: payment_type
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - CREDIT_CARD
+                - BOLETO
+                - VOUCHER
+                - DEBIT_CARD
+                - NOT_DEFINED
+      - name: payment_value
+        tests:
+          - not_null
+
+  # ─── Silver Products ────────────────────────────────────
+  - name: silver_products
+    description: Product attributes with calculated volume and weight categories.
+    columns:
+      - name: product_id
+        description: Primary key
+        tests:
+          - unique
+          - not_null
+      - name: weight_category
+        tests:
+          - accepted_values:
+              values: ["LIGHT", "MEDIUM", "HEAVY", "VERY_HEAVY"]
+
+  # ─── Silver Reviews ─────────────────────────────────────
+  - name: silver_reviews
+    description: Customer reviews with sentiment categorization.
+    columns:
+      - name: review_id
+        description: Primary key
+        tests:
+          - unique
+          - not_null
+      - name: order_id
+        tests:
+          - not_null
+      - name: review_score
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]
+      - name: sentiment_category
+        tests:
+          - accepted_values:
+              values: ["POSITIVE", "NEUTRAL", "NEGATIVE"]

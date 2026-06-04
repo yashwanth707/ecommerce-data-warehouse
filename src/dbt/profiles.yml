@@ -1,0 +1,32 @@
+# dbt Profiles — Snowflake Connection
+# Uses environment variables for credentials.
+# Copy this to ~/.dbt/profiles.yml or set DBT_PROFILES_DIR.
+
+ecommerce_dw:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'SYSADMIN') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'ECOMMERCE_WH') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE', 'ECOMMERCE_DW') }}"
+      schema: RAW
+      threads: 4
+      client_session_keep_alive: true
+      query_tag: "dbt_ecommerce"
+
+    prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'SYSADMIN') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'ECOMMERCE_WH') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE', 'ECOMMERCE_DW') }}"
+      schema: RAW
+      threads: 8
+      client_session_keep_alive: true
+      query_tag: "dbt_ecommerce_prod"

@@ -1,0 +1,53 @@
+# Environment
+.env
+.venv/
+.dbt_venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.pyc
+
+# dbt
+src/dbt/target/
+src/dbt/dbt_packages/
+src/dbt/logs/
+
+# Airflow
+logs/
+airflow-webserver.pid
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data
+*.csv
+*.parquet
+!tests/fixtures/*.csv
+
+# Docker
+docker-compose.override.yml
+
+# Database & Tracking
+src/optimization/cost_tracking.db
+*.db-journal
+
+# Project Cleanup
+archive/
+research/
+scripts/test_*.py
+
+# Project artifacts
+.system_generated/
+.gemini/
+
+# Academic Files
+academic_docs/
+academic_docs_humanized/
+**/ACADEMIC_*
+powerbi/ACADEMIC_*

@@ -1,0 +1,164 @@
+// ADVANCED CALCULATIONS — Pareto, ABC, Anomaly Detection, Seasonality
+
+
+// ── PARETO ANALYSIS (80/20 Rule) ──────────────────────────────────────────
+
+Cumulative Revenue Pct = 
+    VAR CurrentRevenue = [Total Revenue]
+    VAR AllRevenue = CALCULATE([Total Revenue], ALLSELECTED(DIM_CUSTOMERS))
+    VAR CumulativeSum = 
+        SUMX(
+            FILTER(
+                ALLSELECTED(DIM_CUSTOMERS),
+                [Total Revenue] >= CurrentRevenue
+            ),
+            [Total Revenue]
+        )
+    RETURN
+        DIVIDE(CumulativeSum, AllRevenue, 0)
+
+Top 20 Pct Customers Revenue = 
+    VAR TotalCustomers = COUNTROWS(ALL(DIM_CUSTOMERS))
+    VAR Top20Count = ROUND(TotalCustomers * 0.2, 0)
+    VAR Top20Customers = 
+        TOPN(Top20Count, ALL(DIM_CUSTOMERS), [Total Revenue], DESC)
+    RETURN
+        CALCULATE([Total Revenue], Top20Customers)
+
+Top 20 Pct Contribution = 
+    DIVIDE(
+        [Top 20 Pct Customers Revenue],
+        CALCULATE([Total Revenue], ALL(DIM_CUSTOMERS)),
+        0
+    )
+
+
+// ── ABC ANALYSIS ──────────────────────────────────────────────────────────
+
+ABC Class = 
+    VAR CustomerRevenue = [Total Revenue]
+    VAR AllRevenue = CALCULATE([Total Revenue], ALL(DIM_CUSTOMERS))
+    VAR CumulativePct = 
+        DIVIDE(
+            SUMX(
+                FILTER(
+                    ALL(DIM_CUSTOMERS),
+                    [Total Revenue] >= CustomerRevenue
+                ),
+                [Total Revenue]
+            ),
+            AllRevenue,
+            0
+        )
+    RETURN
+        SWITCH(
+            TRUE(),
+            CumulativePct <= 0.80, "A - High Value",
+            CumulativePct <= 0.95, "B - Medium Value",
+            "C - Low Value"
+        )
+
+
+// ── SEASONALITY ──────────────────────────────────────────────────────────
+
+Revenue Same Month Last Year = 
+    CALCULATE(
+        [Total Revenue],
+        SAMEPERIODLASTYEAR(DIM_TIME[DATE_KEY])
+    )
+
+Seasonality Index = 
+    DIVIDE([Total Revenue], [Revenue Same Month Last Year], BLANK())
+
+// Monthly average for seasonal comparison
+Monthly Revenue Average = 
+    AVERAGEX(
+        ALL(DIM_TIME[MONTH_NUMBER]),
+        [Total Revenue]
+    )
+
+Month vs Average = 
+    DIVIDE([Total Revenue], [Monthly Revenue Average], 0) - 1
+
+
+// ── ANOMALY DETECTION (Z-Score) ──────────────────────────────────────────
+
+Revenue Z Score = 
+    VAR MeanRevenue = 
+        AVERAGEX(
+            ALL(DIM_TIME[MONTH_NAME]),
+            [Total Revenue]
+        )
+    VAR StdDev = 
+        STDEVX.P(
+            ALL(DIM_TIME[MONTH_NAME]),
+            [Total Revenue]
+        )
+    VAR CurrentRevenue = [Total Revenue]
+    RETURN
+        DIVIDE(CurrentRevenue - MeanRevenue, StdDev, 0)
+
+Is Anomaly = 
+    IF(ABS([Revenue Z Score]) > 2, "Anomaly", "Normal")
+
+Anomaly Color = 
+    IF(
+        [Is Anomaly] = "Anomaly",
+        IF([Revenue Z Score] > 0, "#2ca02c", "#d62728"),
+        "#7f7f7f"
+    )
+
+
+// ── CROSS-SELL / BASKET ANALYSIS (via fact_order_items) ───────────────────
+
+Multi Item Orders = 
+    CALCULATE(
+        DISTINCTCOUNT(FACT_ORDERS[ORDER_ID]),
+        FACT_ORDERS[TOTAL_ITEMS] > 1
+    )
+
+Cross Sell Rate = 
+    DIVIDE([Multi Item Orders], [Total Orders], 0)
+
+Avg Distinct Products per Order = 
+    AVERAGE(FACT_ORDERS[DISTINCT_PRODUCTS])
+
+
+// ── GEOGRAPHIC CONCENTRATION ──────────────────────────────────────────────
+
+State Revenue Rank = 
+    RANKX(
+        ALL(DIM_CUSTOMERS[CUSTOMER_STATE]),
+        [Total Revenue],
+        ,
+        DESC,
+        Dense
+    )
+
+Top 5 States Revenue = 
+    CALCULATE(
+        [Total Revenue],
+        TOPN(5, ALL(DIM_CUSTOMERS[CUSTOMER_STATE]), [Total Revenue], DESC)
+    )
+
+Top 5 States Concentration = 
+    DIVIDE([Top 5 States Revenue], [Total Revenue], 0)
+
+
+// ── PRODUCT PERFORMANCE (via fact_order_items) ────────────────────────────
+
+Category Revenue Rank = 
+    RANKX(
+        ALL(DIM_PRODUCTS[CATEGORY_NAME_ENGLISH]),
+        [Item Revenue],
+        ,
+        DESC,
+        Dense
+    )
+
+Product Positive Review Rate = 
+    DIVIDE(
+        SUM(DIM_PRODUCTS[POSITIVE_REVIEWS]),
+        SUM(DIM_PRODUCTS[TOTAL_REVIEWS]),
+        0
+    )

@@ -1,0 +1,122 @@
+# ======================================================
+# GitHub Actions — dbt CI/CD Pipeline
+# ======================================================
+# Triggers on Pull Requests touching dbt files.
+# Runs: SQL lint → dbt compile → dbt test
+
+name: dbt CI/CD
+
+on:
+  pull_request:
+    paths:
+      - "src/dbt/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "src/dbt/**"
+
+env:
+  DBT_PROJECT_DIR: src/dbt
+  SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+  SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+  SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+  SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+  SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+  SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+
+jobs:
+  # ---------------------------------------------------
+  # Job 1: SQL Linting
+  # ---------------------------------------------------
+  lint:
+    name: SQL Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SQLFluff
+        run: pip install sqlfluff sqlfluff-templater-dbt
+
+      - name: Lint SQL models
+        run: |
+          cd ${{ env.DBT_PROJECT_DIR }}
+          sqlfluff lint models/ --dialect snowflake || true
+        continue-on-error: true
+
+  # ---------------------------------------------------
+  # Job 2: dbt Compile & Test
+  # ---------------------------------------------------
+  dbt-test:
+    name: dbt Compile & Test
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install dbt-core dbt-snowflake
+
+      - name: Install dbt packages
+        run: |
+          cd ${{ env.DBT_PROJECT_DIR }}
+          dbt deps --profiles-dir .
+
+      - name: dbt compile
+        run: |
+          cd ${{ env.DBT_PROJECT_DIR }}
+          dbt compile --profiles-dir . --target dev
+
+      - name: dbt test (dry run)
+        run: |
+          cd ${{ env.DBT_PROJECT_DIR }}
+          dbt test --profiles-dir . --target dev
+        continue-on-error: true
+
+      - name: Upload dbt artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dbt-artifacts
+          path: |
+            ${{ env.DBT_PROJECT_DIR }}/target/manifest.json
+            ${{ env.DBT_PROJECT_DIR }}/target/run_results.json
+          retention-days: 7
+
+  # ---------------------------------------------------
+  # Job 3: Generate docs (main branch only)
+  # ---------------------------------------------------
+  docs:
+    name: Generate dbt Docs
+    runs-on: ubuntu-latest
+    needs: dbt-test
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install dbt-core dbt-snowflake
+
+      - name: Generate docs
+        run: |
+          cd ${{ env.DBT_PROJECT_DIR }}
+          dbt deps --profiles-dir .
+          dbt docs generate --profiles-dir . --target dev
+
+      - name: Upload docs
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-docs
+          path: ${{ env.DBT_PROJECT_DIR }}/target/
+          retention-days: 30
