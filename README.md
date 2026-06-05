@@ -32,9 +32,9 @@ An end-to-end cloud data warehouse built for the **Brazilian E-Commerce (Olist)*
 - **Medallion Architecture** (Bronze → Silver → Gold) with ELT paradigm
 - **Incremental processing** via dbt merge strategies with partition pruning
 - **Self-healing pipelines** in Apache Airflow with SLA monitoring
-- **4-Model ML Pipeline** using Snowpark (Behavioral, Delivery Delay, Seller Risk, Satisfaction)
-- **Natural Language to SQL** querying via Ollama (Mistral-7B)
-- **Interactive Dashboards** built with both Streamlit and Power BI for deep business intelligence insights
+- **5-Model ML Pipeline** using Snowpark (RFM/CLV, Behavioral Segmentation, Delivery Delay, Seller Risk, Review Score — 4 retained, 1 dropped with documented rationale)
+- **Natural Language to SQL** querying via local Ollama LLM (qwen2.5-coder:3b)
+- **Dual BI Dashboards** — Streamlit (12 sections, AI-powered insights) and Power BI (8 pages, 97 custom DAX measures connected live to Snowflake)
 
 ## 🏗️ Architecture
 
@@ -129,7 +129,18 @@ streamlit run src/dashboard/app.py
 ```
 
 **Power BI Dashboard:**
-Open `powerbi/DataWarehouse_Project.pbix` in Power BI Desktop to view the advanced DAX measures and interactive reports.
+Open `powerbi/DataWarehouse_Project.pbix` in Power BI Desktop. The report connects live to Snowflake via Power Query and contains **8 pages** with **97 custom DAX measures**:
+
+| Page | Content |
+|------|---------|
+| Executive Overview | Revenue KPIs, monthly trends, top-10 states |
+| Customer Intelligence | CLV segments, cohort analysis, RFM scatter |
+| ML Model Performance | Normalized strip plots, model summary |
+| Operational Performance | Filled map, order funnel, payment analysis |
+| behavioral_segmentation | Segment treemap, freight/installments scatter, revenue bars |
+| Delivery Risk Prediction | Risk-tier donut, probability histogram, order drillthrough |
+| Seller Risk Management | Risk scatter, delay bars, seller drillthrough table |
+| ML Model Registry | Live KPI cards (4 run · 3 retained · 1 dropped), registry table |
 
 ## 📊 Dataset
 
@@ -153,17 +164,18 @@ Open `powerbi/DataWarehouse_Project.pbix` in Power BI Desktop to view the advanc
 ### Self-Healing Pipelines & AI Monitoring
 Airflow DAGs automatically detect and repair data quality failures in the Silver layer. Pipeline failures trigger AI-generated plain-English incident summaries via Slack.
 
-### Snowpark ML (4-Model Pipeline)
-A robust parallel ML pipeline running natively in Snowflake:
-1. **Behavioral Segmentation**: K-Means clustering for customer grouping.
-2. **Delivery Delay Prediction**: Random Forest model to flag late shipments.
-3. **Seller Risk Clustering**: K-Means evaluation of seller reliability.
-4. **Model Registry**: Automated threshold evaluation to retain or drop models.
+### Snowpark ML (5-Model Pipeline, 4 Retained)
+A robust parallel ML pipeline running natively in Snowflake, governed by a shared `ML_MODEL_REGISTRY` table with threshold-based retention decisions:
+1. **RFM / CLV Analysis**: K-Means clustering with Elbow + Silhouette sweep, dynamic segment labeling (Champions, Loyal, Potential, At Risk, Hibernating).
+2. **Behavioral Segmentation**: K-Means (K=3, Silhouette=0.33) on 6 behavioral features — overcomes the single-purchase limitation of traditional RFM.
+3. **Delivery Delay Prediction**: Random Forest (F1=0.87, ROC-AUC=0.999, Accuracy=98%) with `class_weight=balanced` for the 6.8% late-delivery class imbalance.
+4. **Seller Risk Clustering**: K-Means (K=2, Silhouette=0.84) with composite risk score formula.
+5. **Review Score Prediction**: ❌ Dropped — F1 Macro=0.45 (threshold ≥0.60). NEUTRAL class precision was 11%; demonstrates rigorous model evaluation.
 
 ### AI Dashboards & Natural Language Querying
 The project features dual dashboarding solutions:
-- **Streamlit**: Includes AI Narrative buttons for instant insights and plain-English business questioning powered by a local Ollama LLM.
-- **Power BI**: Provides comprehensive, interactive BI reports built on top of the Gold layer, utilizing advanced DAX measures for operational metrics, Time Intelligence, and CLV Analytics.
+- **Streamlit** (1,587 lines): 12 dashboard sections including AI Executive Summary, ML Insights Panel (4 tabs), Black Friday Simulator, NL-to-SQL interface, and real-time cost monitoring — all with live Snowflake connectivity and glassmorphism UI.
+- **Power BI** (8 pages, 97 DAX measures): 4 core analytics pages (Executive Overview, Customer Intelligence, ML Model Performance, Operational Performance) and 4 dedicated ML deep-dive pages (Behavioral Segmentation, Delivery Risk Prediction, Seller Risk Management, ML Model Registry). Advanced DAX includes time intelligence (MTD/QTD/YTD, MoM/YoY growth), Pareto/ABC analysis, Z-score anomaly detection, TREATAS virtual relationships for ML table integration, What-If CLV parameters, and RANKX geographic ranking.
 
 ### FinOps & Cost Optimization
 Integrated cost monitoring via `cost_tracking.db`, surfaced directly in the dashboard. Features one-click Snowflake auto-suspend enforcement (60s idle) and automated resource monitors.
